@@ -1,97 +1,60 @@
-#include  "coder.cpp"
+#include "TableTranspositionCipher.h"
 #include <locale>
-#include <iostream>
-#include <codecvt>
+#include <typeinfo>
+
 using namespace std;
-
-
-void check(wstring Text, wstring key, bool destructCipherText=false)
-{ 
-try {
-	coder cipher(key);
-	wstring enc_text = cipher.encrypt(Text);
-	if (destructCipherText)
-			enc_text.front() = towlower(enc_text.front());
-    wstring dec_text = cipher.decrypt(enc_text);
-	wcout<<L"key="<<key<<endl;
-	wcout<<Text<<endl;
-	wcout<<enc_text<<endl;
-	wcout<<dec_text<<endl;
-	} catch (const cipher_error & e) {
-		cerr<<"Error: "<<e.what()<<endl;
-	}
-}
-
-int main(int argc, char **argv)
-{ 
-	locale loc("ru_RU.UTF-8");
-    locale::global(loc);
-    wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t> codec;
-    wcout << L"1 test:  ";
-	check(L"Россияне",L"0"); //ожидалось > 0
-	wcout << L"2 test:  ";
-	check(L"Россияне",L""); // ожидался ключ
-	wcout << L"3 test:  ";
-	check(L"Россияне",L">!-*k"); // ожидалось целое число 
-	wcout << L"4 test:  ";
-	check(L"Россияне",L"3",true); // "ломаем" текст, ожидалось неверный текст 
-	wcout << L"5 test:  ";
-	check(L"РОССИЯНЕ",L"3"); // ожидалось верный текст
-	wcout << L"6 test:  ";
-	check(L"Рос2сияне",L"3"); // ожидалось неверный текст 
-	wcout << L"7 test:  ";
-	check(L"HELLO,РОССИЯНЕ",L"3"); //ожидалось неверный текст
-	wcout << L"8 test:  ";
-	check(L"",L"3"); //ожидался текст 
-	wcout << L"9 test:  ";
-	check(L"HELLOРОССИЯНЕ",L"3"); //ожидалось верный текст
-	return 0;
-}
-
-/*******************
-bool isValid(const wstring& s)
+std::wstring toValid(std::wstring& s)
 {
-    for (auto c:s)
-        if (!iswalpha(c) || !iswupper(c))
-            return false;
-    return true;
-}
-
-int main()
-{
-    locale loc("ru_RU.UTF-8");
-    locale::global(loc);
-    int key;
-    wstring text;
-    int op;
-    wcout<<L"<Крипер> готов. Введи ключ (целое число): ";
-    wcin>>key;
-    if (!wcin.good()) {
-        wcerr<<L"ключ недействителен.\n";
-        return 0;
+    using convert_type = std::codecvt_utf8<wchar_t>;
+    std::wstring_convert<convert_type, wchar_t> converter;
+    if (s.empty())
+        throw cipher_error("Empty text");
+    std::wstring tmp(s);
+    std::string a = converter.to_bytes(s);
+    for (auto & c:tmp) {
+        if (!iswalpha(c))
+            throw cipher_error(("Invalid TEXT: ") +a);
+        if (iswlower(c))
+            c = towupper(c);
     }
-
-    coder cipher(key);
-    do {
-        wcout<<L"<Крипер> готов. Введи операцию (0-завершить, 1-зашифровать, 2-расшифровать): ";
-        wcin>>op;
-        if (op != 0 and op != 1 and op != 2) {
-            wcout<<L"НЕзаконная операция!\n";
-        } else if (op >0) {
-            wcout<<L"<Крипер> готов. Введи текст(без пробелов и капсом): ";
-            wcin.ignore(); 
-            getline(wcin, text);
-            if (isValid(text)) {
-                if (op == 1) {
-                    wcout<<L"Зашифрованный текст: "<<cipher.encrypt(text)<<endl;
-                } else if (op == 2){
-                    wcout<<L"Расшифрованный текст: "<<cipher.decrypt(text)<<endl;
-                }
-            } else {
-                wcout<<L"Операция прервана.... неверный текст....\n";
-            }
-        }
-    } while (op != 0);
-    return 0;
+    return tmp;
 }
-*******************/
+int main(int argc, char **argv)
+{
+    try {
+        locale loc("ru_RU.UTF-8");
+        locale::global(loc);
+        int key;
+        wstring text;
+        int op;
+        wcout<<L"Cipher ready. Input key: ";
+        wcin>>key;
+        if (key < 2){
+            throw(cipher_error("Invalid key"));
+        }
+        std::cout << key;
+        TableTranspositionCipher cipher(key);
+        do {
+            wcout<<L"Cipher ready. Input operation (0-exit, 1-encrypt, 2-decrypt):";
+            wcin>>op;
+            if (op > 2) {
+                throw cipher_error("Illegal operation\n");
+            } else if (op >0) {
+                wcout<<L"Cipher ready. Input text: ";
+                wcin>>text;
+                std::wstring vtext=toValid(text);
+                if (op==1) {
+                    wcout<<L"Encrypted text: "<<cipher.encrypt(vtext)<<endl;
+                } else {
+                    wcout<<L"Decrypted text: "<<cipher.decrypt(vtext)<<endl;
+                }
+            }
+        } while (op!=0);
+    } catch (const cipher_error& e) {
+        cerr << "Error: " << e.what() << endl;
+        return 1;
+    } catch (const exception& e) {
+        cerr << "Exception: " << e.what() << endl;
+        return 1;
+    }
+}
